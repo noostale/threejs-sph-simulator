@@ -1,0 +1,12 @@
+{
+    "name": "SmoothedParticleHydrodynamics",
+    "version": "1.0.0",
+    "author": "Emanuele Frasca",
+    "description": "A simple SPH simulation",
+    "main": "index.js",
+    "dependencies": {
+        "three": "^0.88.0",
+        "stats.js": "^17.0.0",
+        "dat.gui": "^0.7.2"
+    }
+}
