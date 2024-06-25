@@ -1,6 +1,4 @@
-import * as THREE from 'three';
-import * as dat from 'dat.gui';
-import Stats from 'stats.js';
+
 
 /**
  * To run use the `npx vite` command in the folder where the main.js file is located.
