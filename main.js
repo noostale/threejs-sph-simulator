@@ -2,8 +2,22 @@ import * as THREE from 'three';
 import * as dat from 'dat.gui';
 import Stats from 'stats.js';
 
-
-// Parameters for a viscous fluid: smoothingLength: 0.55, graivity: 2, referenceDensity: 2.9, gasConstant: 0.4, viscosity: -4, particlesMass: 0.3, timeStep: 0.2
+/**
+ * To run use the `npx vite` command in the folder where the main.js file is located.
+ * 
+ * Javascript Syntax
+ * { } way to define objects in Javascript
+ * Example:
+ * const obj = { x: 1, y: 2 }; === const obj = new Object(); obj.x = 1; obj.y = 2;
+ * 
+ * => - Arrow function, it is a shorter way to write a function. It does not have its own 
+ * this, arguments, super, or new.target since it estracts them from the outer scope.
+ * Example:
+ * const square = x => x * 2; === const square = function(x) { return x * 2; };
+ * 
+ * Parameters for fluid: smoothingLength: 0.55, graivity: 2, referenceDensity: 2.9, 
+ * gasConstant: 0.4, viscosity: -4, particlesMass: 0.3, timeStep: 0.2
+ */
 
 const simulationParams = {
     
@@ -15,12 +29,9 @@ const simulationParams = {
     particlesMetalness: 0.3,     // Metalness of the particles, higher values will make the particles to be more reflective
     particlesRoughness: 0.3,     // Roughness of the particles, higher values will make the particles to be less smooth
 
-
-
     particlesDimensions: 0.15,   // Diameter of the particles
     particleSpacing: 0.30,       // Initial spacing between the particles
     zSimulation: 7,              // Z position of the camera
-    
     
     ThirdDimension: true,        // Set to false to simulate in 2D
     enableReflections: false,    // Set to true to enable real-time reflections (works only when InstancedMesh is disabled)
@@ -39,7 +50,6 @@ const simulationParams = {
 
 };
 
-
 // Class to represent a particle in the simulation
 class Particle {
     constructor(position, velocity, index) {
@@ -52,17 +62,24 @@ class Particle {
         this.forces = new THREE.Vector3(0, 0, 0);
         this.index = index;
 
+        // If InstancedMesh is disabled, create the strcutore to store the mesh and the
+        // CubeCamera for reflections
         if (!simulationParams.InstancedMesh) {
 
-            // Create CubeCamera for real-time reflections
+            // Create where CubeCamera will store the reflections
             const cubeRenderTarget = new THREE.WebGLCubeRenderTarget(128, {
                 format: THREE.RGBFormat,
                 generateMipmaps: true,
                 minFilter: THREE.LinearMipmapLinearFilter,
             });
 
+            // Create a CubeCamera, this is an object that contains 6 cameras, one for
+            // each face of the cube, and renders the scene from the particle position
+            // to capture the reflections
             this.cubeCamera = new THREE.CubeCamera(0.1, 1000, cubeRenderTarget);
 
+            // Create a material for the single particle since we are not using 
+            // InstancedMesh
             this.sphereMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffff00,
                 metalness: simulationParams.particlesMetalness,
@@ -76,7 +93,7 @@ class Particle {
     }
 }
 
-// Function to create the GUI for the simulation parameters
+// Function to create the GUI for the simulation parameters using the dat.gui library
 function createGui() {
     const gui = new dat.GUI();
 
@@ -90,6 +107,14 @@ function createGui() {
     gui.add(simulationParams, 'viscosity', 0, 10).name('Viscosity');
 
     // On particle mass change, loop over all the particles and update their mass
+    // Here we are using the object literal to create a new object with the property
+    // particlesMass, since the dat.gui library expects an object to be passed as the
+    // first parameter. the method .onChange() is used to update the mass of the particles
+    // using as input a function,that will receive the new value selected by the user as
+    // the value parameter. finally we use an arrow function to update the mass of the 
+    // particles insted of a function declaration to make the code more concise.
+    // NOTE: we don't have to recreate the GUI, the .onChange() is an event listener that
+    // uses the Javascript event loop to listen for changes in the GUI.
     gui.add({ particlesMass: simulationParams.particlesMass }, 'particlesMass', 0.1, 1).name('Mass').onChange((value) => {
         simulationParams.particlesMass = value;
         for (let i = 0; i < particles.length; i++) {
@@ -100,6 +125,7 @@ function createGui() {
     // On particle metalness change, loop over all the particles and update their metalness
     gui.add({ particlesMetalness: simulationParams.particlesMetalness }, 'particlesMetalness', 0, 1).name('Metalness').onChange((value) => {
         simulationParams.particlesMetalness = value;
+
         if (!simulationParams.InstancedMesh){
             for (let i = 0; i < particles.length; i++) {
                 particles[i].sphereMaterial.metalness = simulationParams.particlesMetalness;
@@ -157,6 +183,7 @@ function createGui() {
         }
     }}, 'toggleEnvironment').name('Toggle Environment Map');
 
+
     gui.add({ toggleGravity: () => {
         simulationParams.gravity = simulationParams.gravity === 0 ? 9 : 0;
         gui.__controllers.find(c => c.property === 'gravity').updateDisplay();
@@ -169,15 +196,15 @@ function createGui() {
         }
     }}, 'toggleReflections').name('Toggle Reflections (InstancedMesh disabled)');
 
+    // Toggle the grid optimization for the SPH calculations
     gui.add({ toggleGridOptimization: () => {
         simulationParams.useGridOptimization = !simulationParams.useGridOptimization;
     }}, 'toggleGridOptimization').name('Toggle Grid Optimization');
 }
 
-
-// Function to update the geometry of the simulation box according to the parameters selected in the GUI
+// Function to update the geometry of the simulation box according to the parameters 
+// selected in the GUI
 function updateBoxGeometry() {
-
     scene.remove(cube);
     if (simulationParams.ThirdDimension) {
         cubeGeometry = new THREE.BoxGeometry(simulationParams.boxWidth, simulationParams.boxHeight, simulationParams.boxDepth);
@@ -262,97 +289,6 @@ function calculateDensityAndPressure(particles, h, rho0, k) {
     }
 }
 
-// Function to calculate the forces acting on the particles using a grid optimization
-function calculateDensityAndPressureOptimized(particles, h, rho0, k) {
-    const cellSize = h;
-    const cells = new Map();
-    for (let i = 0; i < particles.length; i++) {
-        const cellX = Math.floor(particles[i].position.x / cellSize);
-        const cellY = Math.floor(particles[i].position.y / cellSize);
-        const cellZ = Math.floor(particles[i].position.z / cellSize);
-        const cellId = `${cellX}-${cellY}-${cellZ}`;
-        if (!cells.has(cellId)) {
-            cells.set(cellId, []);
-        }
-        cells.get(cellId).push(i);
-    }
-    for (let i = 0; i < particles.length; i++) {
-        let density = 0;
-        const cellX = Math.floor(particles[i].position.x / cellSize);
-        const cellY = Math.floor(particles[i].position.y / cellSize);
-        const cellZ = Math.floor(particles[i].position.z / cellSize);
-        for (let x = cellX - 1; x <= cellX + 1; x++) {
-            for (let y = cellY - 1; y <= cellY + 1; y++) {
-                for (let z = cellZ - 1; z <= cellZ + 1; z++) {
-                    const cellId = `${x}-${y}-${z}`;
-                    if (cells.has(cellId)) {
-                        for (const j of cells.get(cellId)) {
-                            const r = particles[i].position.distanceTo(particles[j].position);
-                            if (r < h) { // Only consider neighbors within smoothing length
-                                density += particles[j].mass * kernel(r, h);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        particles[i].density = density;
-        particles[i].pressure = k * (particles[i].density - rho0);
-    }
-}
-
-// Function to calculate the forces acting on the particles using a grid optimization
-function calculateForcesOptimized(particles, h, mu, g) {
-    const cellSize = h;
-    const cells = new Map();
-    for (let i = 0; i < particles.length; i++) {
-        const cellX = Math.floor(particles[i].position.x / cellSize);
-        const cellY = Math.floor(particles[i].position.y / cellSize);
-        const cellZ = Math.floor(particles[i].position.z / cellSize);
-        const cellId = `${cellX}-${cellY}-${cellZ}`;
-        if (!cells.has(cellId)) {
-            cells.set(cellId, []);
-        }
-        cells.get(cellId).push(i);
-    }
-    for (let i = 0; i < particles.length; i++) {
-        let pressureForce = new THREE.Vector3(0, 0, 0);
-        let viscosityForce = new THREE.Vector3(0, 0, 0);
-        const gravityForce = new THREE.Vector3(0, -g * particles[i].mass, 0);
-        particles[i].forces.set(0, 0, 0);
-        const cellX = Math.floor(particles[i].position.x / cellSize);
-        const cellY = Math.floor(particles[i].position.y / cellSize);
-        const cellZ = Math.floor(particles[i].position.z / cellSize);
-        for (let x = cellX - 1; x <= cellX + 1; x++) {
-            for (let y = cellY - 1; y <= cellY + 1; y++) {
-                for (let z = cellZ - 1; z <= cellZ + 1; z++) {
-                    const cellId = `${x}-${y}-${z}`;
-                    if (cells.has(cellId)) {
-                        for (const j of cells.get(cellId)) {
-                            if (i === j) continue; // Skip the particle itself
-                            const r = particles[i].position.distanceTo(particles[j].position);
-                            if (r < h) { // Only consider neighbors within smoothing length
-                                const gradient = gradientKernel(r, h);
-                                const pressure = (particles[i].pressure + particles[j].pressure) / (2 * particles[j].density);
-                                const direction = new THREE.Vector3().subVectors(particles[i].position, particles[j].position).normalize();
-                                pressureForce.add(direction.multiplyScalar(-particles[j].mass * pressure * gradient));
-
-                                const viscosity = mu * (particles[j].mass / Math.max(particles[j].density, 0.0001));
-                                const relativeVelocity = new THREE.Vector3().subVectors(particles[j].velocity, particles[i].velocity);
-                                viscosityForce.add(relativeVelocity.multiplyScalar(-viscosity * gradient));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        particles[i].forces.add(pressureForce);
-        particles[i].forces.add(viscosityForce);
-        particles[i].forces.add(gravityForce);
-    }
-}
-
 // Function to calculate the forces acting on the particles using the naive approach
 function calculateForces(particles, h, mu, g) {
     for (let i = 0; i < particles.length; i++) {
@@ -387,7 +323,142 @@ function calculateForces(particles, h, mu, g) {
             }
         }
 
+        // Update the forces acting on the particle
+        particles[i].forces.add(pressureForce);
+        particles[i].forces.add(viscosityForce);
+        particles[i].forces.add(gravityForce);
+    }
+}
 
+// Function to calculate the forces acting on the particles using a grid optimization
+function calculateDensityAndPressureOptimized(particles, h, rho0, k) {
+    const cellSize = h; // Cell size is equal to the smoothing length
+    const cells = new Map(); // Map to store the i
+
+    // Put every particle in a cell, so that we can easily find its neighbors
+    for (let i = 0; i < particles.length; i++) {
+
+        // Compute the cell x, y, z where the particle is going to be located
+        const cellX = Math.floor(particles[i].position.x / cellSize);
+        const cellY = Math.floor(particles[i].position.y / cellSize);
+        const cellZ = Math.floor(particles[i].position.z / cellSize);
+        const cellId = `${cellX}-${cellY}-${cellZ}`; // Create a unique cell id to store the particles
+
+        // If the cell does not exist, create it
+        if (!cells.has(cellId)) {
+            cells.set(cellId, []);
+        }
+
+        // Add the particle index to the cell
+        cells.get(cellId).push(i);
+    }
+
+    for (let i = 0; i < particles.length; i++) {
+
+        let density = 0;
+        // find the cell where the particle is located
+        const cellX = Math.floor(particles[i].position.x / cellSize);
+        const cellY = Math.floor(particles[i].position.y / cellSize);
+        const cellZ = Math.floor(particles[i].position.z / cellSize);
+
+        // Loop over the neighboring cells to find the neighbors of the particle
+        for (let x = cellX - 1; x <= cellX + 1; x++) {
+            for (let y = cellY - 1; y <= cellY + 1; y++) {
+                for (let z = cellZ - 1; z <= cellZ + 1; z++) {
+
+                    // Compute the cell id
+                    const cellId = `${x}-${y}-${z}`;
+
+                    // Check if the cell exists in the map
+                    if (cells.has(cellId)) {
+                        // Loop over the particles in the cell to calculate the density
+                        for (const j of cells.get(cellId)) {
+                            // Compute the distance between the particles
+                            const r = particles[i].position.distanceTo(particles[j].position);
+
+                            if (r < h) { // Only consider neighbors within smoothing length
+                                density += particles[j].mass * kernel(r, h);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // Update the density and pressure of the particle
+        particles[i].density = density;
+        particles[i].pressure = k * (particles[i].density - rho0);
+    }
+}
+
+// Function to calculate the forces acting on the particles using a grid optimization
+function calculateForcesOptimized(particles, h, mu, g) {
+    const cellSize = h;
+    const cells = new Map();
+    for (let i = 0; i < particles.length; i++) {
+
+        // Compute the cell x, y, z where the particle is going to be located
+        const cellX = Math.floor(particles[i].position.x / cellSize);
+        const cellY = Math.floor(particles[i].position.y / cellSize);
+        const cellZ = Math.floor(particles[i].position.z / cellSize);
+
+        // Create a unique cell id to store the particles
+        const cellId = `${cellX}-${cellY}-${cellZ}`;
+
+        // If the cell does not exist, create it
+        if (!cells.has(cellId)) {
+            cells.set(cellId, []);
+        }
+        // Add the particle index to the cell
+        cells.get(cellId).push(i);
+    }
+    for (let i = 0; i < particles.length; i++) {
+
+        // Initialize the forces acting on the particle
+        let pressureForce = new THREE.Vector3(0, 0, 0);
+        let viscosityForce = new THREE.Vector3(0, 0, 0);
+        const gravityForce = new THREE.Vector3(0, -g * particles[i].mass, 0);
+        particles[i].forces.set(0, 0, 0);
+
+        // Find the cell x, y, z where the particle is located
+        const cellX = Math.floor(particles[i].position.x / cellSize);
+        const cellY = Math.floor(particles[i].position.y / cellSize);
+        const cellZ = Math.floor(particles[i].position.z / cellSize);
+
+        // Loop over the neighboring cells to find the neighbors of the particle
+        for (let x = cellX - 1; x <= cellX + 1; x++) {
+            for (let y = cellY - 1; y <= cellY + 1; y++) {
+                for (let z = cellZ - 1; z <= cellZ + 1; z++) {
+
+                    // Compute the cell id
+                    const cellId = `${x}-${y}-${z}`;
+                    if (cells.has(cellId)) {
+                        for (const j of cells.get(cellId)) {
+
+
+                            // Compute the distance between the particles
+                            const r = particles[i].position.distanceTo(particles[j].position);
+
+                            if (r < h) {
+                                // Compute the gradient of the kernel function to find the forces direction
+                                const gradient = gradientKernel(r, h);
+
+                                // Compute the pressure
+                                const pressure = (particles[i].pressure + particles[j].pressure) / (2 * particles[j].density);
+                                const direction = new THREE.Vector3().subVectors(particles[i].position, particles[j].position).normalize();
+                                pressureForce.add(direction.multiplyScalar(-particles[j].mass * pressure * gradient));
+
+                                // Compute the viscosity
+                                const viscosity = mu * (particles[j].mass / Math.max(particles[j].density, 0.0001));
+                                const relativeVelocity = new THREE.Vector3().subVectors(particles[j].velocity, particles[i].velocity);
+                                viscosityForce.add(relativeVelocity.multiplyScalar(-viscosity * gradient));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Update the forces acting on the particle
         particles[i].forces.add(pressureForce);
         particles[i].forces.add(viscosityForce);
         particles[i].forces.add(gravityForce);
@@ -410,14 +481,14 @@ function updateParticles(particles, timeStep) {
             const color = new THREE.Color(0x0000ff);
             color.setHSL((velocity + 1) / 2, 1, 0.5);
             particles[i].sphereMaterial.color = color;
-        } else {
-            const dummy = new THREE.Object3D();
-            dummy.position.copy(particles[i].position);
-            dummy.updateMatrix();
-            instancedMesh.setMatrixAt(particles[i].index, dummy.matrix);
+        } else { // If InstancedMesh is enabled, we have computed new positions for the particles, now we need to update the InstancedMesh Matrix with the new positions using a dummy object to simulate the wanted matrix transformation
+            const dummy = new THREE.Object3D(); // Create a dummy 3D object
+            dummy.position.copy(particles[i].position); // Set the position of the dummy object to the particle position
+            dummy.updateMatrix(); // Update the transformation matrix of the dummy object
+            instancedMesh.setMatrixAt(particles[i].index, dummy.matrix); // Set the matrix of the particle in the InstancedMesh to the dummy matrix to have the new transformation matrix
         }
 
-        // Check for collisions with the simulation boundary
+        // Check for collisions with the simulation boundary checking the position of the particles with respect to the box walls and reflecting the particles with a restitution factor if they collide with the walls
         if (particles[i].position.x < simulationParams.boxWidth / -2 || particles[i].position.x > simulationParams.boxWidth / 2) {
             particles[i].velocity.x *= -1 * simulationParams.BoxRestitution;
             particles[i].position.x = Math.max(Math.min(particles[i].position.x, simulationParams.boxWidth / 2), simulationParams.boxWidth / -2);
@@ -441,9 +512,9 @@ function computeReflections(particles) {
     if (simulationParams.enableReflections) {
         for (let i = 0; i < particles.length; i++) {
             const particle = particles[i];
-            particle.mesh.visible = false; // Hide the particle during the reflection capture
-            particle.cubeCamera.position.copy(particle.position);
-            particle.cubeCamera.update(renderer, scene);
+            particle.mesh.visible = false; // Hide the particle during the reflection capture, or it could be reflected in itself causing artifacts
+            particle.cubeCamera.position.copy(particle.position); // Set the position of the CubeCamera to the particle position (so the 6 cameras will capture the reflections around the particle position itself)
+            particle.cubeCamera.update(renderer, scene); // Update the CubeCamera to capture the reflections from the current particle position
             particle.mesh.visible = true; // Show the particle after the reflection capture
         }
     }
@@ -452,12 +523,15 @@ function computeReflections(particles) {
 // Three.js rendering loop function
 function animate() {
 
+    // Update the InstancedMesh matrix. Based on the user interaction with the GUI
     if (simulationParams.InstancedMesh) {
         instancedMesh.instanceMatrix.needsUpdate = true;
     }
 
+    // Schedule the animate function to be called on the next frame to create a loop and render at display refresh rate
     requestAnimationFrame(animate);
 
+    // Calculate the density, pressure and forces acting on the particles with or without grid optimization
     if (simulationParams.useGridOptimization) {
         calculateDensityAndPressureOptimized(
             particles,
@@ -486,10 +560,16 @@ function animate() {
         );
     }
 
+    // Update the position of the particles based on the forces acting on them, with or without InstancedMesh optimization
     updateParticles(particles, simulationParams.timeStep);
+
+    // Compute the reflections of the particles if enabled
     computeReflections(particles);
 
+    // Update the stats to show the performance of the simulation
     stats.update();
+
+    // Render the scene from the viewpoint of the camera
     renderer.render(scene, camera);
 }
 
@@ -567,21 +647,21 @@ function onWindowResize() {
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-
 // Setup a scene, camera, renderer
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer();
 
-// set camera position
+// Set camera position
 camera.position.z = simulationParams.zSimulation;
 
-//set background color
+// Set background color
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setClearColor(0x33393c)
 document.body.appendChild(renderer.domElement);
 
-// Add to the DOM the stats panel
+// Create the GUI for the simulation parameters
+createGui();
 const stats = new Stats();
 document.body.appendChild(stats.dom);
 
@@ -594,13 +674,13 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
 directionalLight.position.set(1, 1, 1).normalize();
 scene.add(directionalLight);
 
-// Load the environment map
+// Load an equirectangular environment map for realist reflections
 const loader = new THREE.TextureLoader();
 loader.load('map.jpg', function (texture) {
     texture.mapping = THREE.EquirectangularReflectionMapping;
 });
 
-// Create a geometry for the particles and the box
+// Create a geometry for the particles and the box walls in both 2D and 3D modes
 let sphereGeometry, cubeGeometry;
 if (simulationParams.ThirdDimension) {
     sphereGeometry = new THREE.SphereGeometry(simulationParams.particlesDimensions, 16, 16);
@@ -611,7 +691,7 @@ if (simulationParams.ThirdDimension) {
 }
 
 
-// Create a grid of particles
+// Create a grid of particles in the simulation box
 const particles = gridOfParticles(
     simulationParams.numberOfParticles,
     simulationParams.numberOfParticles,
@@ -621,7 +701,6 @@ const particles = gridOfParticles(
     simulationParams.boxDepth,
     simulationParams.particleSpacing
 );
-
 
 // Create a cube as bounding box for the simulation
 let cubeMaterial = new THREE.MeshBasicMaterial({ color: 0x000000, wireframe: true });
@@ -636,9 +715,13 @@ if (simulationParams.InstancedMesh) {
     scene.add(instancedMesh);
 }
 
-updateBoxGeometry();
+// Add javascript event listeners
 window.addEventListener('resize', onWindowResize, false);
 rotateCameraMouse();
 moveCameraArrows();
-createGui();
+
+// Update the geometry of the simulation box according to the parameters selected at startup
+updateBoxGeometry();
+
+// Start the rendering loop (since we are using requestAnimationFrame, this will be called on the next frame)
 animate();
