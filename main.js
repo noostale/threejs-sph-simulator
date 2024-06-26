@@ -152,6 +152,30 @@ function createGui() {
         }
     });
 
+    if (!simulationParams.InstancedMesh) {
+        // Remove all the particles and create a new grid of particles with the new number of particles chosen by the user
+        gui.add({ numberOfParticles: simulationParams.numberOfParticles }, 'numberOfParticles', 1, 20, 1).name('Number of Particles').onChange((value) => {
+            simulationParams.numberOfParticles = value;
+
+            // Remove all the particles from the scene
+            for (let i = 0; i < particles.length; i++) {
+                scene.remove(particles[i].mesh);
+            }
+            // Reset the particles array and create a new grid of particles
+            particles.length = 0;
+            particles.push(...gridOfParticles(
+                simulationParams.numberOfParticles,
+                simulationParams.numberOfParticles,
+                simulationParams.ThirdDimension ? simulationParams.numberOfParticles : 1,
+                simulationParams.boxWidth,
+                simulationParams.boxHeight,
+                simulationParams.boxDepth,
+                simulationParams.particleSpacing
+            ));
+        });
+    }
+    
+
     gui.add({ zSimulation: simulationParams.zSimulation }, 'zSimulation', 0, 20).name('Z Distance').onChange((value) => {
         simulationParams.zSimulation = value;
         camera.position.z = value;
@@ -177,12 +201,14 @@ function createGui() {
         }
     }}, 'toggleEnvironment').name('Toggle Environment Map');
 
-    gui.add({ toggleReflections: () => {
-        if (!simulationParams.InstancedMesh) {
-            simulationParams.enableReflections = !simulationParams.enableReflections;
+    if (!simulationParams.InstancedMesh) {
+        gui.add({ toggleReflections: () => {
+            if (!simulationParams.InstancedMesh) {
+                simulationParams.enableReflections = !simulationParams.enableReflections;
+            }
         }
+        }, 'toggleReflections').name('Toggle Reflections');
     }
-    }, 'toggleReflections').name('Toggle Reflections (InstancedMesh disabled)');
     
     gui.add({ toggleGravity: () => {
         simulationParams.gravity = simulationParams.gravity === 0 ? 9 : 0;
@@ -568,7 +594,9 @@ function animate() {
     updateParticles(particles, simulationParams.timeStep);
 
     // Compute the reflections of the particles if enabled
-    computeReflections(particles);
+    if (!simulationParams.InstancedMesh) {
+        computeReflections(particles);
+    }
 
     // Update the stats to show the performance of the simulation
     stats.update();
