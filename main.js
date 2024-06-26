@@ -97,6 +97,11 @@ class Particle {
 function createGui() {
     const gui = new dat.GUI();
 
+    // If user is on android or ios devices, close the GUI by default
+    if (navigator.userAgent.match(/(Android)|(iPhone)|(iPad)/)) {
+        gui.close();
+    }
+
     //set default width
     gui.width = 300;
     gui.add(simulationParams, 'timeStep', 0.01, 0.5).name('Time Step');
