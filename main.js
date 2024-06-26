@@ -1,4 +1,6 @@
-
+//import * as THREE from 'three';
+//import * as dat from 'dat.gui';
+//import Stats from 'stats.js'; 
 
 /**
  * To run use the `npx vite` command in the folder where the main.js file is located.
@@ -23,7 +25,7 @@ const simulationParams = {
     boxHeight: 4,                // Height of the simulation box
     boxDepth: 4,                 // Depth of the simulation box (only used in 3D)
 
-    numberOfParticles: 8,        // Number of particles in each dimension
+    numberOfParticles: 4,        // Number of particles in each dimension
     particlesMetalness: 0.3,     // Metalness of the particles, higher values will make the particles to be more reflective
     particlesRoughness: 0.3,     // Roughness of the particles, higher values will make the particles to be less smooth
 
@@ -33,7 +35,7 @@ const simulationParams = {
     
     ThirdDimension: true,        // Set to false to simulate in 2D
     enableReflections: false,    // Set to true to enable real-time reflections (works only when InstancedMesh is disabled)
-    InstancedMesh: true,         // Set to true to use an InstancedMesh for rendering the particles
+    InstancedMesh: false,         // Set to true to use an InstancedMesh for rendering the particles
     useGridOptimization: true,   // Set to true to use a grid optimization for the SPH calculations
     showEnvironment: false,      // Set to true to show an environment map
 
@@ -60,7 +62,7 @@ class Particle {
         this.forces = new THREE.Vector3(0, 0, 0);
         this.index = index;
 
-        // If InstancedMesh is disabled, create the strcutore to store the mesh and the
+        // If InstancedMesh is disabled, create the strcture to store the mesh and the
         // CubeCamera for reflections
         if (!simulationParams.InstancedMesh) {
 
@@ -162,37 +164,25 @@ function createGui() {
     gui.add({ toggleEnvironment: () => {
         simulationParams.showEnvironment = !simulationParams.showEnvironment;
         if (simulationParams.showEnvironment) {
-            loader.load('map.jpg', function (texture) {
-                texture.mapping = THREE.EquirectangularReflectionMapping;
-                scene.background = texture;
-                scene.environment = texture;
-            });
-
-            // Set the environment map to the particles
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].sphereMaterial.envMap = scene.environment;
-            }
+            scene.background = environmentTexture;
+            scene.environment = environmentTexture;
         } else {
-            scene.environment = null;
             scene.background = null;
-            for (let i = 0; i < particles.length; i++) {
-                particles[i].sphereMaterial.envMap = null;
-            }
+            scene.environment = null;
         }
     }}, 'toggleEnvironment').name('Toggle Environment Map');
-
-
-    gui.add({ toggleGravity: () => {
-        simulationParams.gravity = simulationParams.gravity === 0 ? 9 : 0;
-        gui.__controllers.find(c => c.property === 'gravity').updateDisplay();
-    }}, 'toggleGravity').name('Toggle Gravity');
 
     gui.add({ toggleReflections: () => {
         if (!simulationParams.InstancedMesh) {
             simulationParams.enableReflections = !simulationParams.enableReflections;
-            computeReflections(particles); // Ensure reflections are computed when toggled
         }
-    }}, 'toggleReflections').name('Toggle Reflections (InstancedMesh disabled)');
+    }
+    }, 'toggleReflections').name('Toggle Reflections (InstancedMesh disabled)');
+    
+    gui.add({ toggleGravity: () => {
+        simulationParams.gravity = simulationParams.gravity === 0 ? 9 : 0;
+        gui.__controllers.find(c => c.property === 'gravity').updateDisplay();
+    }}, 'toggleGravity').name('Toggle Gravity');
 
     // Toggle the grid optimization for the SPH calculations
     gui.add({ toggleGridOptimization: () => {
@@ -505,16 +495,27 @@ function updateParticles(particles, timeStep) {
     }
 }
 
-// Function to compute the reflections of the particles if enabled
 function computeReflections(particles) {
-    if (simulationParams.enableReflections) {
-        for (let i = 0; i < particles.length; i++) {
-            const particle = particles[i];
+
+    for (let i = 0; i < particles.length; i++) {
+        const particle = particles[i];
+
+        if (simulationParams.enableReflections) {
             particle.mesh.visible = false; // Hide the particle during the reflection capture, or it could be reflected in itself causing artifacts
             particle.cubeCamera.position.copy(particle.position); // Set the position of the CubeCamera to the particle position (so the 6 cameras will capture the reflections around the particle position itself)
             particle.cubeCamera.update(renderer, scene); // Update the CubeCamera to capture the reflections from the current particle position
             particle.mesh.visible = true; // Show the particle after the reflection capture
+
+            // Use the captured reflections as the envMap
+            particle.sphereMaterial.envMap = particle.cubeCamera.renderTarget.texture;
+        } else if (simulationParams.showEnvironment && !simulationParams.enableReflections) {
+            // If reflections are disabled, but the environment map is enabled, use the environment map as the envMap
+            particle.sphereMaterial.envMap = scene.environment;
+        } else {
+            // If both reflections and environment map are disabled, set the envMap to null
+            particle.sphereMaterial.envMap = null;
         }
+
     }
 }
 
@@ -598,7 +599,7 @@ function rotateCameraMouse() {
         if (gui && gui.contains(e.target)) {
             return;
         }
-
+        
         if (isMouseDown) {
             const deltaMove = {
                 x: e.clientX - previousMousePosition.x,
@@ -672,10 +673,22 @@ const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
 directionalLight.position.set(1, 1, 1).normalize();
 scene.add(directionalLight);
 
-// Load an equirectangular environment map for realist reflections
+// Variable to store the environment texture
+let environmentTexture;
+
+// Load an equirectangular environment map for realist reflections and set it according
+// to the initial value of the showEnvironment parameter
 const loader = new THREE.TextureLoader();
 loader.load('map.jpg', function (texture) {
     texture.mapping = THREE.EquirectangularReflectionMapping;
+    environmentTexture = texture;
+    if (simulationParams.showEnvironment) {
+        scene.background = texture;
+        scene.environment = texture;
+    } else {
+        scene.background = null;
+        scene.environment = null;
+    }
 });
 
 // Create a geometry for the particles and the box walls in both 2D and 3D modes
@@ -711,6 +724,11 @@ if (simulationParams.InstancedMesh) {
     var instancedMesh; // This is a var, so it can be accessed from the animate function (global scope)
     instancedMesh = new THREE.InstancedMesh(sphereGeometry, instancedMaterial, particles.length);
     scene.add(instancedMesh);
+}
+
+// If user is on android or ios devices, move the camera further away
+if (navigator.userAgent.match(/(Android)|(iPhone)|(iPad)/)) {
+    camera.position.z = 15;
 }
 
 // Add javascript event listeners
