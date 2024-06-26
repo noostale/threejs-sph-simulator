@@ -25,7 +25,7 @@ const simulationParams = {
     boxHeight: 4,                // Height of the simulation box
     boxDepth: 4,                 // Depth of the simulation box (only used in 3D)
 
-    numberOfParticles: 4,        // Number of particles in each dimension
+    numberOfParticles: 8,        // Number of particles in each dimension
     particlesMetalness: 0.3,     // Metalness of the particles, higher values will make the particles to be more reflective
     particlesRoughness: 0.3,     // Roughness of the particles, higher values will make the particles to be less smooth
 
