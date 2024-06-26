@@ -2,6 +2,9 @@
 
 This repository contains an implementation of a Smoothed Particle Hydrodynamics (SPH) fluid simulation using Three.js. The simulation models fluid dynamics by calculating interactions between particles based on physical properties such as density, pressure, and viscosity. The code provides a real-time visualization of the fluid system, allowing users to adjust simulation parameters and observe the behavior of the fluid in a 2D or 3D environment.
 
+
+![demo](demo.png)
+
 ## Table of Contents
 
 - [Smoothed Particle Hydrodynamics Implementation in Three.js](#smoothed-particle-hydrodynamics-implementation-in-threejs)
