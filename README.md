@@ -1,33 +1,31 @@
-# Smoothed Particle Hydrodynamics Implementation in Three.js
+# Smoothed Particle Hydrodynamics Implementation in Three.js <!-- omit from toc -->
 
 This repository contains an implementation of a Smoothed Particle Hydrodynamics (SPH) fluid simulation using Three.js. The simulation models fluid dynamics by calculating interactions between particles based on physical properties such as density, pressure, and viscosity. The code provides a real-time visualization of the fluid system, allowing users to adjust simulation parameters and observe the behavior of the fluid in a 2D or 3D environment.
 
 
 ![demo](demo.png)
 
-## Table of Contents
+## Table of Contents <!-- omit from toc -->
 
-- [Smoothed Particle Hydrodynamics Implementation in Three.js](#smoothed-particle-hydrodynamics-implementation-in-threejs)
-  - [Table of Contents](#table-of-contents)
-  - [What is Smoothed Particle Hydrodynamics?](#what-is-smoothed-particle-hydrodynamics)
-  - [What is a smoothing kernel?](#what-is-a-smoothing-kernel)
-  - [What is the math involved?](#what-is-the-math-involved)
-    - [Kernel Function](#kernel-function)
-    - [Density](#density)
-    - [Pressure](#pressure)
-    - [Pressure Force](#pressure-force)
-    - [Viscosity Force](#viscosity-force)
-    - [Gravity Force](#gravity-force)
-  - [Code Implementation](#code-implementation)
-    - [Core Features](#core-features)
-    - [Simulation Parameters](#simulation-parameters)
-    - [Main Rendering Loop](#main-rendering-loop)
-    - [Paticle Class](#paticle-class)
-    - [Main Three.js Components Used](#main-threejs-components-used)
-  - [Code Optimization](#code-optimization)
-    - [Grid-based updates](#grid-based-updates)
-    - [Instanced Mesh](#instanced-mesh)
-  - [Conclusions](#conclusions)
+- [What is Smoothed Particle Hydrodynamics?](#what-is-smoothed-particle-hydrodynamics)
+- [What is a smoothing kernel?](#what-is-a-smoothing-kernel)
+- [What is the math involved?](#what-is-the-math-involved)
+  - [Kernel Function](#kernel-function)
+  - [Density](#density)
+  - [Pressure](#pressure)
+  - [Pressure Force](#pressure-force)
+  - [Viscosity Force](#viscosity-force)
+  - [Gravity Force](#gravity-force)
+- [Code Implementation](#code-implementation)
+  - [Core Features](#core-features)
+  - [Simulation Parameters](#simulation-parameters)
+  - [Main Rendering Loop](#main-rendering-loop)
+  - [Paticle Class](#paticle-class)
+  - [Main Three.js Components Used](#main-threejs-components-used)
+- [Code Optimization](#code-optimization)
+  - [Grid-based updates](#grid-based-updates)
+  - [Instanced Mesh](#instanced-mesh)
+- [Conclusions](#conclusions)
 
 ## What is Smoothed Particle Hydrodynamics?
 
