@@ -711,8 +711,10 @@ let environmentTexture;
 
 // Load an equirectangular environment map for realist reflections and set it according
 // to the initial value of the showEnvironment parameter
+const mapUrl = new URL('../assets/map.jpg', import.meta.url).href;
+
 const loader = new THREE.TextureLoader();
-loader.load('map.jpg', function (texture) {
+loader.load(mapUrl, function (texture) {
     texture.mapping = THREE.EquirectangularReflectionMapping;
     environmentTexture = texture;
     if (simulationParams.showEnvironment) {
